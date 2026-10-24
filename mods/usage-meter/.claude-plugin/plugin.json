@@ -2,5 +2,7 @@
   "name": "usage-meter",
   "version": "0.3.0",
   "description": "Live context, rate limit and cost meter above the prompt",
+  "author": { "name": "TomDiem" },
+  "license": "MIT",
   "types": "./types/index.d.ts"
 }

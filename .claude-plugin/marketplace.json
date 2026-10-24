@@ -1,0 +1,12 @@
+{
+  "name": "claude-mods",
+  "description": "Mods for Claude Code: small plugins that change what it shows and how it behaves",
+  "owner": { "name": "TomDiem" },
+  "plugins": [
+    {
+      "name": "usage-meter",
+      "source": "./mods/usage-meter",
+      "description": "Live context, rate limit and cost meter above the prompt"
+    }
+  ]
+}
