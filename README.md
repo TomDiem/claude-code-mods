@@ -22,7 +22,7 @@ From a shell:
 claude plugin install usage-meter --marketplace TomDiem/claude-mods
 ```
 
-Built and tested on Claude Code 2.1.302.
+Built and tested on Claude Code 2.1.310.
 
 ## Develop
 
