@@ -32,6 +32,8 @@ claude plugin validate mods/usage-meter  # what the engine would accept or refus
 claude plugin test mods/usage-meter      # run the mod's *.test.ts files
 ```
 
+Each mod's `tsconfig.json` extends the types Claude Code writes into `.claude-plugin/types/` the first time it loads the mod, so `tsc -p mods/<mod>` works after that first load.
+
 ## License
 
 [MIT](LICENSE)
