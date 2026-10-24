@@ -1,0 +1,6 @@
+{
+  "name": "usage-meter",
+  "version": "0.1.0",
+  "description": "Live context usage bar above the prompt",
+  "types": "./types/index.d.ts"
+}
