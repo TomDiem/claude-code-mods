@@ -1,13 +1,15 @@
 import { atom, read, update } from 'claude-code'
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 
-import type { Usage } from '../types'
+import type { Turn, Usage } from '../types'
 
 const usage = atom({ plugin: 'usage-meter', key: 'usage' } as const, null)
+const last = atom({ plugin: 'usage-meter', key: 'last' } as const, null)
 const now = atom({ plugin: 'usage-meter', key: 'now' } as const, 0)
 
 const BAR_WIDTH = 10
 const MINUTE = 60_000
+const WARN_PERCENT = 80
 const LABELS: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
 
 const bar = (percent: number) => {
@@ -16,6 +18,10 @@ const bar = (percent: number) => {
 }
 
 const k = (tokens: number) => `${Math.round(tokens / 1000)}k`
+
+const dollars = (amount: number) => `$${amount.toFixed(2)}`
+
+const signed = (n: number, unit: (n: number) => string) => `${n < 0 ? '-' : '+'}${unit(Math.abs(n))}`
 
 const duration = (ms: number) => {
   const minutes = Math.max(0, Math.round(ms / MINUTE))
@@ -29,7 +35,7 @@ const duration = (ms: number) => {
   return hours > 0 ? `${hours}h${minutes % 60}m` : `${minutes}m`
 }
 
-const format = ({ context, rateLimits, usd }: Usage, time: number) => {
+const totals = ({ context, rateLimits, usd }: Usage, time: number) => {
   const parts: string[] = []
 
   if (context.tokens !== undefined && context.percent !== undefined) {
@@ -42,13 +48,22 @@ const format = ({ context, rateLimits, usd }: Usage, time: number) => {
   }
 
   if (usd !== undefined) {
-    parts.push(`$${usd.toFixed(2)}`)
+    parts.push(dollars(usd))
   }
 
   return parts.join('  ·  ')
 }
 
+const delta = ({ tokens, usd }: Turn) => `last turn ${signed(tokens, k)} ctx, ${signed(usd, dollars)}`
+
+const snapshot = async ($: EngineInterface): Promise<Turn> => {
+  const { context, cost } = await $.session.usage()
+  return { tokens: context.tokens ?? 0, usd: cost?.usd ?? 0 }
+}
+
 export const register: Register = on => {
+  let baseline: Turn | null = null
+
   on('session.start', async ($, e, next) => {
     const tick = async () => {
       const time = await $.clock.now()
@@ -62,21 +77,54 @@ export const register: Register = on => {
   })
 
   on('session.measure', async ($, e, next) => {
+    const previous = (await read($, usage))?.context.percent ?? 0
+    const percent = e.context.percent ?? 0
+
+    if (previous < WARN_PERCENT && percent >= WARN_PERCENT) {
+      $.ui.toast(`Context at ${percent}%: consider /compact`)
+    }
+
     await update($, usage, () => ({ context: e.context, rateLimits: e.rateLimits, usd: e.cost?.usd }))
+
+    return next(e)
+  })
+
+  on('turn.start', async ($, e, next) => {
+    if (!e.agentId) {
+      baseline = await snapshot($)
+    }
+
+    return next(e)
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const before = baseline
+
+    if (!e.agentId && before) {
+      const after = await snapshot($)
+      await update($, last, () => ({ tokens: after.tokens - before.tokens, usd: after.usd - before.usd }))
+    }
 
     return next(e)
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const current = await read($, usage)
-    const line = current && format(current, await read($, now))
+    const turn = await read($, last)
+    const summary = current ? totals(current, await read($, now)) : ''
+    const change = turn ? delta(turn) : ''
 
-    if (e.props.hasSurvey || !line) {
+    if (e.props.hasSurvey || (!summary && !change)) {
       return next(e)
     }
 
-    const { Text } = $.ui.resolve(e)
+    const { Box, Text } = $.ui.resolve(e)
 
-    return <Text dimColor>{line}</Text>
+    return (
+      <Box flexDirection="column">
+        {summary ? <Text dimColor>{summary}</Text> : null}
+        {change ? <Text dimColor>{change}</Text> : null}
+      </Box>
+    )
   })
 }

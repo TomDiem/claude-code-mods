@@ -36,3 +36,44 @@ test('draws context, rate limits and cost, and counts down to the reset', async 
 
   expect(await text()).toContain('(resets 2h13m)')
 })
+
+test('shows what the last main turn added', async ($, on) => {
+  let current = { tokens: 100_000, usd: 1.5 }
+  on('session.usage', () => ({
+    value: {
+      startedAt: 0,
+      context: { tokens: current.tokens, window: 200_000 },
+      rateLimits: [],
+      cost: { usd: current.usd },
+    },
+  }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+
+  await $.turn.start({ text: 'hi', turnId: 't1' })
+  current = { tokens: 112_000, usd: 1.71 }
+  await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+
+  const ui = await $.ui.mount(band)
+
+  expect((await ui.find({ type: 'Text', text: /last turn/ }))?.text).toBe('last turn +12k ctx, +$0.21')
+})
+
+test('warns once when the context crosses 80%', async ($, on) => {
+  const toasts: string[] = []
+  on('ui.toast', (_, e) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
+  on('session.measure', (_, e) => ({ changed: e.changed }))
+
+  for (const percent of [70, 82, 85]) {
+    await $.session.measure({
+      context: { tokens: percent * 2000, window: 200_000, percent },
+      rateLimits: [],
+      changed: ['context'],
+    })
+  }
+
+  expect(toasts).toEqual(['Context at 82%: consider /compact'])
+})

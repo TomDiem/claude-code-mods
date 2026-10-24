@@ -4,8 +4,10 @@ export type Usage = {
   usd?: number
 }
 
+export type Turn = { tokens: number; usd: number }
+
 declare module 'claude-code' {
   interface PluginState {
-    'usage-meter': { usage: Usage | null; now: number }
+    'usage-meter': { usage: Usage | null; last: Turn | null; now: number }
   }
 }
