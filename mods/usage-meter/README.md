@@ -25,5 +25,5 @@ Reads the session's usage figures only. No network, no files, no model calls, no
 ## Install
 
 ```
-/plugin install usage-meter --marketplace TomDiem/claude-mods
+/plugin install usage-meter --marketplace TomDiem/claude-code-mods
 ```

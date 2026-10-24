@@ -1,4 +1,4 @@
-# claude-mods
+# claude-code-mods
 
 Mods for [Claude Code](https://code.claude.com): small plugins that change what Claude Code shows and how it behaves. Each mod is independent, so you install only the ones you want.
 
@@ -13,13 +13,13 @@ Mods for [Claude Code](https://code.claude.com): small plugins that change what 
 At the prompt of a Claude Code terminal session:
 
 ```
-/plugin install usage-meter --marketplace TomDiem/claude-mods
+/plugin install usage-meter --marketplace TomDiem/claude-code-mods
 ```
 
 From a shell:
 
 ```bash
-claude plugin install usage-meter --marketplace TomDiem/claude-mods
+claude plugin install usage-meter --marketplace TomDiem/claude-code-mods
 ```
 
 Built and tested on Claude Code 2.1.310.
