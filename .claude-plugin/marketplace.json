@@ -1,5 +1,5 @@
 {
-  "name": "claude-mods",
+  "name": "tomdiem-mods",
   "description": "Mods for Claude Code: small plugins that change what it shows and how it behaves",
   "owner": { "name": "TomDiem" },
   "plugins": [
