@@ -15,7 +15,6 @@ jobs:
         with:
           node-version: 22
 
-      # Pinned: the mods API is early access and changes between releases.
       - run: npm install -g @anthropic-ai/claude-code@2.1.310
 
       - name: Validate marketplace
