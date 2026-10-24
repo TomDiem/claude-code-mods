@@ -14,9 +14,9 @@ last turn +12k ctx, +$0.21
 | `ctx` | Context window fill: tokens the last response was answered over, against the model's window |
 | `5h` / `7d` | Subscription rate limit windows and the time until each resets (Pro/Max only; absent with an API key) |
 | `$` | Session cost so far, as `/cost` totals it |
-| `last turn` | Context growth and cost of the last main turn (subagent turns are ignored). Negative after a `/compact` |
+| `last turn` | Context growth and cost of the last main turn, subagent spend included. Negative after a `/compact` |
 
-A toast warns once when the context crosses 80%.
+A toast warns each time the context crosses 80%.
 
 ## Access
 

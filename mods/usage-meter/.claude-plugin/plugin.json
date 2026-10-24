@@ -1,6 +1,6 @@
 {
   "name": "usage-meter",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Live context, rate limit and cost meter above the prompt",
   "author": { "name": "TomDiem" },
   "license": "MIT",

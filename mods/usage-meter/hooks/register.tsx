@@ -56,9 +56,9 @@ const totals = ({ context, rateLimits, usd }: Usage, time: number) => {
 
 const delta = ({ tokens, usd }: Turn) => `last turn ${signed(tokens, k)} ctx, ${signed(usd, dollars)}`
 
-const snapshot = async ($: EngineInterface): Promise<Turn> => {
+const snapshot = async ($: EngineInterface): Promise<Turn | null> => {
   const { context, cost } = await $.session.usage()
-  return { tokens: context.tokens ?? 0, usd: cost?.usd ?? 0 }
+  return context.tokens === undefined ? null : { tokens: context.tokens, usd: cost?.usd ?? 0 }
 }
 
 export const register: Register = on => {
@@ -101,8 +101,12 @@ export const register: Register = on => {
     const before = baseline
 
     if (!e.agentId && before) {
+      baseline = null
       const after = await snapshot($)
-      await update($, last, () => ({ tokens: after.tokens - before.tokens, usd: after.usd - before.usd }))
+
+      if (after) {
+        await update($, last, () => ({ tokens: after.tokens - before.tokens, usd: after.usd - before.usd }))
+      }
     }
 
     return next(e)
