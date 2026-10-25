@@ -3,6 +3,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import { due, fit, settle, status } from './core'
 import type { Entry, Io, Segment, Source } from './core'
+import { details } from './details'
+import type { Section } from './details'
 import { github } from './github'
 import { line } from './line'
 
@@ -10,6 +12,7 @@ const entries = atom({ plugin: 'up-to-date', key: 'entries' } as const, {})
 const now = atom({ plugin: 'up-to-date', key: 'now' } as const, 0)
 
 const MINUTE = 60_000
+const PANE = 'up-to-date'
 const sources: Source<any>[] = [github]
 // sorts after the rank of any real item: a source that never worked comes last
 const AFTER_ALL = 1_000
@@ -83,6 +86,40 @@ const segmentOf = (
   return segment && state === 'stale' ? { ...segment, stale: true, levels: segment.levels.map(level => `~${level}`) } : segment
 }
 
+const ago = (ms: number) => {
+  const minutes = Math.max(1, Math.floor(ms / MINUTE))
+
+  return minutes < 60 ? `${minutes} min ago` : `${Math.floor(minutes / 60)} h ago`
+}
+
+// what the pane lists for a source: its groups, dim-noted when stale; a source that never
+// worked says why instead, a pending one that it is checking; nothing when it is fine and empty
+const sectionOf = (
+  source: Source,
+  entry: Entry<unknown> | undefined,
+  time: number,
+  options: Record<string, unknown>,
+): Section | undefined => {
+  const { icon, label } = source
+  const state = status(entry, true)
+
+  if (state === 'pending') {
+    return { icon, label, groups: [], note: 'checking…' }
+  }
+
+  if (state === 'failed') {
+    return { icon, label, groups: [], note: entry?.error?.reason }
+  }
+
+  const groups = source.details?.(entry?.items ?? [], time, options) ?? []
+
+  if (state === 'stale') {
+    return { icon, label, groups, note: `last updated ${ago(time - (entry?.at ?? 0))}` }
+  }
+
+  return groups.length === 0 ? undefined : { icon, label, groups }
+}
+
 export const register: Register = (on, options) => {
   const enabled = sources.filter(source => source.enabled(options))
   let timer: ReturnType<EngineInterface['clock']['every']> | undefined
@@ -134,11 +171,21 @@ export const register: Register = (on, options) => {
 
     const { Box } = $.ui.resolve(e)
 
+    const open = () => void $.ui.open({ id: PANE, title: 'Up to date', focus: true, closeOnEscape: true }).catch(() => {})
+
     return (
       <Box flexDirection="column">
         {rest}
-        {line($.ui.resolve(e), shown, hidden)}
+        {line($.ui.resolve(e), shown, hidden, open)}
       </Box>
     )
+  })
+
+  // drawn from the entries alone: opening the pane never fetches
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const all = await read($, entries)
+    const time = await read($, now)
+
+    return details($.ui.resolve(e), enabled.flatMap(source => sectionOf(source, all[source.id], time, options) ?? []))
   })
 }
