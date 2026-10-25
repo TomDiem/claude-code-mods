@@ -1,0 +1,15 @@
+{
+  "name": "up-to-date",
+  "version": "0.1.0",
+  "description": "One line above the prompt showing what needs you, from sources you opt into",
+  "author": { "name": "TomDiem" },
+  "license": "MIT",
+  "userConfig": {
+    "github": {
+      "type": "boolean",
+      "title": "GitHub",
+      "description": "Show review requests, failing CI and requested changes on your pull requests (needs gh)",
+      "default": false
+    }
+  }
+}
