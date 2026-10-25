@@ -10,8 +10,9 @@ export type Io = {
   run(argv: string[], options?: { timeoutMs?: number }): Promise<{ exitCode: number; stdout: string; stderr: string }>
 }
 
-// rank 0 is the most urgent
-export type Line = { rank: number; text: string; detail: string }
+// what one source shows: its levels run from the fullest text to the shortest, rank 0 is the
+// most urgent item it holds; the tone only says how loud the shell may draw it
+export type Segment = { rank: number; levels: string[]; tone?: 'urgent' | 'alert' | 'active' | 'muted'; stale?: boolean }
 
 type Options = Record<string, unknown>
 
@@ -19,10 +20,13 @@ type Options = Record<string, unknown>
 export type Source<I = unknown> = {
   id: string
   label: string
+  // leads the source's segment, also when it only says why it is failing
+  icon: string
   ttlMs: number
   enabled(options: Options): boolean
   fetch(io: Io, now: number): Promise<Fetched<I>>
-  lines(items: I[], now: number, options: Options): Line[]
+  // undefined: nothing to show
+  segment(items: I[], now: number, options: Options): Segment | undefined
 }
 
 export type Entry<I> = {
@@ -34,22 +38,60 @@ export type Entry<I> = {
 }
 
 const MAX_BACKOFF = 30 * 60_000
-const SEPARATOR = ' · '
+export const SEPARATOR = ' · '
 
-// ASCII labels only, so `.length` is the display width
-export const fit = (lines: Line[], columns: number) => {
-  const texts = [...lines].sort((a, b) => a.rank - b.rank).map(line => line.text)
+// icons must be emoji-presentation characters from the supplementary plane (🔀 📅): the table
+// does not cover the BMP ones (⏰ ✅) that terminals may draw either way
+// emoji and East Asian wide characters take two columns; the joiner and the emoji selector none
+const isWide = (code: number) =>
+  (code >= 0x1100 && code <= 0x115f) ||
+  (code >= 0x2e80 && code <= 0xa4cf) ||
+  (code >= 0xac00 && code <= 0xd7a3) ||
+  (code >= 0xf900 && code <= 0xfaff) ||
+  (code >= 0xfe30 && code <= 0xfe6f) ||
+  (code >= 0xff00 && code <= 0xff60) ||
+  (code >= 0xffe0 && code <= 0xffe6) ||
+  (code >= 0x1f300 && code <= 0x1f64f) ||
+  (code >= 0x1f680 && code <= 0x1f6ff) ||
+  (code >= 0x1f900 && code <= 0x1faff) ||
+  (code >= 0x20000 && code <= 0x3fffd)
 
-  for (let count = texts.length; count > 0; count--) {
-    const hidden = texts.length - count
-    const suffix = hidden > 0 ? `${SEPARATOR}+${hidden}` : ''
+export const cells = (text: string) =>
+  [...text].reduce((sum, char) => {
+    const code = char.codePointAt(0) as number
 
-    if (texts.slice(0, count).join(SEPARATOR).length + suffix.length <= columns) {
-      return { shown: texts.slice(0, count), hidden }
+    return sum + (code === 0xfe0f || code === 0x200d ? 0 : isWide(code) ? 2 : 1)
+  }, 0)
+
+// most urgent first (ties keep source order). Too wide, the least urgent segment shortens
+// level by level until it is at its shortest, then the next more urgent one, and so on; if even
+// that is too wide the least urgent segment is dropped, the rest start over at their fullest
+// level, and the dropped ones are counted in ` · +N`. If not even the most urgent one fits it
+// is still returned at its shortest, for the shell to truncate.
+export const fit = (segments: Segment[], columns: number) => {
+  const ordered = [...segments].sort((a, b) => a.rank - b.rank)
+
+  for (let keep = ordered.length; keep > 0; keep--) {
+    const kept = ordered.slice(0, keep)
+    const levels = kept.map(() => 0)
+    const suffix = keep < ordered.length ? `${SEPARATOR}+${ordered.length - keep}` : ''
+    const text = (i: number) => (kept[i] as Segment).levels[levels[i] as number] ?? ''
+    const wide = () => cells(kept.map((_, i) => text(i)).join(SEPARATOR) + suffix)
+
+    for (let i = keep - 1; i >= 0 && wide() > columns; i--) {
+      while (wide() > columns && (levels[i] as number) < (kept[i] as Segment).levels.length - 1) {
+        levels[i] = (levels[i] as number) + 1
+      }
+    }
+
+    if (wide() <= columns) {
+      return { shown: kept.map((segment, i) => ({ segment, text: text(i) })), hidden: ordered.length - keep }
     }
   }
 
-  return { shown: [], hidden: texts.length }
+  const first = ordered[0]
+
+  return { shown: first ? [{ segment: first, text: first.levels[first.levels.length - 1] ?? '' }] : [], hidden: 0 }
 }
 
 // a failure keeps the last good items (stale) and backs off: ttl * 2^fails, capped,

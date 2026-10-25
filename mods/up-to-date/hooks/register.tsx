@@ -2,15 +2,17 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import { due, fit, settle, status } from './core'
-import type { Entry, Io, Line, Source } from './core'
+import type { Entry, Io, Segment, Source } from './core'
 import { github } from './github'
+import { line } from './line'
 
 const entries = atom({ plugin: 'up-to-date', key: 'entries' } as const, {})
 const now = atom({ plugin: 'up-to-date', key: 'now' } as const, 0)
 
 const MINUTE = 60_000
-const SEPARATOR = ' · '
 const sources: Source<any>[] = [github]
+// sorts after the rank of any real item: a source that never worked comes last
+const AFTER_ALL = 1_000
 
 const storeKey = (source: Source) => `up-to-date:v1:${source.id}`
 
@@ -64,14 +66,21 @@ const refresh = async ($: EngineInterface, source: Source, time: number) => {
 }
 
 // a source that never worked says why; one that did keeps its last items, marked stale
-const linesOf = (source: Source, entry: Entry<unknown> | undefined, time: number, options: Record<string, unknown>): Line[] => {
-  if (status(entry, true) === 'failed') {
-    return [{ rank: 3, text: `${source.id}: ${entry?.error?.reason}`, detail: '' }]
+const segmentOf = (
+  source: Source,
+  entry: Entry<unknown> | undefined,
+  time: number,
+  options: Record<string, unknown>,
+): Segment | undefined => {
+  const state = status(entry, true)
+
+  if (state === 'failed') {
+    return { rank: AFTER_ALL, tone: 'muted', levels: [`${source.icon} ${source.id}: ${entry?.error?.reason}`, `${source.icon} !`] }
   }
 
-  const mark = status(entry, true) === 'stale' ? '~' : ''
+  const segment = source.segment(entry?.items ?? [], time, options)
 
-  return source.lines(entry?.items ?? [], time, options).map(line => ({ ...line, text: mark + line.text }))
+  return segment && state === 'stale' ? { ...segment, stale: true, levels: segment.levels.map(level => `~${level}`) } : segment
 }
 
 export const register: Register = (on, options) => {
@@ -116,19 +125,19 @@ export const register: Register = (on, options) => {
     const rest = await next(e)
     const all = await read($, entries)
     const time = await read($, now)
-    const lines = enabled.flatMap(source => linesOf(source, all[source.id], time, options))
-    const { shown, hidden } = fit(lines, e.props.bodyColumns)
+    const segments = enabled.flatMap(source => segmentOf(source, all[source.id], time, options) ?? [])
+    const { shown, hidden } = fit(segments, e.props.bodyColumns)
 
     if (e.props.hasSurvey || shown.length === 0) {
       return rest
     }
 
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box } = $.ui.resolve(e)
 
     return (
       <Box flexDirection="column">
         {rest}
-        <Text dimColor>{shown.join(SEPARATOR) + (hidden > 0 ? `${SEPARATOR}+${hidden}` : '')}</Text>
+        {line($.ui.resolve(e), shown, hidden)}
       </Box>
     )
   })

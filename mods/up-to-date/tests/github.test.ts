@@ -75,15 +75,40 @@ test('asks gh api graphql for review requests and my PRs', async () => {
   expect(calls[0]?.slice(0, 5)).toEqual(['gh', 'api', 'graphql', '-f', expect.stringMatching(/^query=.*review-requested:@me/s)])
 })
 
-test('builds ranked ASCII lines from cached items', async () => {
-  const result = await fetched(answer([pr(12)], [pr(3, failing), pr(4, changes)]))
-  const items = result.ok ? result.items : []
+const segmentOf = async (review: object[], mine: object[]) => {
+  const result = await fetched(answer(review, mine))
 
-  expect(github.lines(items, 0, {})).toEqual([
-    { rank: 0, text: 'review app#12', detail: 'app#12 PR 12' },
-    { rank: 1, text: 'ci app#3', detail: 'app#3 PR 3' },
-    { rank: 2, text: 'changes app#4', detail: 'app#4 PR 4' },
-  ])
+  return github.segment(result.ok ? result.items : [], 0, {})
+}
+
+test('shows one urgent segment for the top PR when a review is requested', async () => {
+  expect(await segmentOf([pr(12), pr(13), pr(14)], [pr(3, failing)])).toEqual({
+    rank: 0,
+    tone: 'urgent',
+    levels: ['🔀 app#12 review requested +3', '🔀 #12 review +3', '🔀 4 PRs'],
+  })
+  expect(await segmentOf([pr(12)], [])).toEqual({
+    rank: 0,
+    tone: 'urgent',
+    levels: ['🔀 app#12 review requested', '🔀 #12 review', '🔀 1 PR'],
+  })
+})
+
+test('shows failing CI in alert and requested changes without a tone', async () => {
+  expect(await segmentOf([], [pr(3, failing), pr(4, changes)])).toEqual({
+    rank: 1,
+    tone: 'alert',
+    levels: ['🔀 app#3 CI failing +1', '🔀 #3 CI +1', '🔀 2 PRs'],
+  })
+  expect(await segmentOf([], [pr(4, changes)])).toEqual({
+    rank: 2,
+    levels: ['🔀 app#4 changes requested', '🔀 #4 changes', '🔀 1 PR'],
+  })
+})
+
+test('shows nothing when no PR needs you, and never draws a title', async () => {
+  expect(await segmentOf([], [pr(5)])).toBeUndefined()
+  expect(JSON.stringify(await segmentOf([pr(12)], []))).not.toContain('PR 12')
 })
 
 test('is enabled only when the github option is on', () => {

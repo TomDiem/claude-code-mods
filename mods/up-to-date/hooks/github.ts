@@ -1,4 +1,4 @@
-import type { Fetched, Io, Line, Reason, Source } from './core'
+import type { Fetched, Io, Reason, Segment, Source } from './core'
 
 type Why = 'review' | 'ci' | 'changes'
 
@@ -6,7 +6,15 @@ type Why = 'review' | 'ci' | 'changes'
 export type Pr = { repo: string; number: number; title: string; url: string; reason: Why; draft: boolean }
 
 const TIMEOUT_MS = 15_000
+const ICON = '🔀'
 const RANK: Record<Why, number> = { review: 0, ci: 1, changes: 2 }
+const TONE: Record<Why, Segment['tone']> = { review: 'urgent', ci: 'alert', changes: undefined }
+// the full label, then the short one for a narrow terminal
+const LABELS: Record<Why, [string, string]> = {
+  review: ['review requested', 'review'],
+  ci: ['CI failing', 'CI'],
+  changes: ['changes requested', 'changes'],
+}
 
 // one round trip: reviews asked of me, and my open PRs with their CI and review state
 const QUERY = `query {
@@ -106,17 +114,34 @@ const fetchPrs = async (io: Io): Promise<Fetched<Pr>> => {
   }
 }
 
-const line = ({ repo, number, title, reason }: Pr): Line => ({
-  rank: RANK[reason],
-  text: `${reason} ${repo}#${number}`,
-  detail: `${repo}#${number} ${title}`,
-})
+// the top PR (items arrive most urgent first) speaks for the source; titles are never drawn
+const segment = (items: Pr[]): Segment | undefined => {
+  const [top] = items
+
+  if (!top) {
+    return undefined
+  }
+
+  const [full, short] = LABELS[top.reason]
+  const more = items.length > 1 ? ` +${items.length - 1}` : ''
+
+  return {
+    rank: RANK[top.reason],
+    tone: TONE[top.reason],
+    levels: [
+      `${ICON} ${top.repo}#${top.number} ${full}${more}`,
+      `${ICON} #${top.number} ${short}${more}`,
+      `${ICON} ${items.length} PR${items.length > 1 ? 's' : ''}`,
+    ],
+  }
+}
 
 export const github: Source<Pr> = {
   id: 'github',
   label: 'GitHub',
+  icon: ICON,
   ttlMs: 5 * 60_000,
   enabled: options => options.github === true,
   fetch: fetchPrs,
-  lines: items => items.map(line),
+  segment,
 }
