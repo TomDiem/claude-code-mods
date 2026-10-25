@@ -7,6 +7,7 @@ Mods for [Claude Code](https://code.claude.com): small plugins that change what 
 | Mod | What it does |
 |-----|--------------|
 | [usage-meter](mods/usage-meter) | Live context, rate limit and cost meter above the prompt, plus what the last turn added |
+| [up-to-date](mods/up-to-date) | One line above the prompt showing what needs you (GitHub review requests, failing CI), from sources you opt into |
 
 ## Install
 
