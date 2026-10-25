@@ -4,7 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import { due, fit, settle, status } from './core'
 import type { Entry, Io, Segment, Source } from './core'
 import { github } from './github'
-import { line, PADDING } from './line'
+import { line } from './line'
 
 const entries = atom({ plugin: 'up-to-date', key: 'entries' } as const, {})
 const now = atom({ plugin: 'up-to-date', key: 'now' } as const, 0)
@@ -126,7 +126,7 @@ export const register: Register = (on, options) => {
     const all = await read($, entries)
     const time = await read($, now)
     const segments = enabled.flatMap(source => segmentOf(source, all[source.id], time, options) ?? [])
-    const { shown, hidden } = fit(segments, e.props.bodyColumns - 2 * PADDING)
+    const { shown, hidden } = fit(segments, e.props.bodyColumns)
 
     if (e.props.hasSurvey || shown.length === 0) {
       return rest

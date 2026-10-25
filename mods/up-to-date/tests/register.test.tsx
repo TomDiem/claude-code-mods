@@ -232,14 +232,14 @@ const drawn = async ($: any, on: any, segments: Segment[], columns: number) => {
   return texted($)
 }
 
-test('fits the line to the body columns less the padding, down to the exact column', { ...github }, async ($, on) => {
+test('fits the line to the body columns, down to the exact column', { ...github }, async ($, on) => {
   const { texts } = await world($, on, [reply(1)])
   const mount = async (bodyColumns: number) =>
     (await (await $.ui.mount({ ...band, props: { ...band.props, bodyColumns } })).findAll({ type: 'Text' })).map((t: any) => t.text)
 
-  // '🔀 app#1 review requested' is 25 wide, plus one column of padding on each side
-  expect(await mount(27)).toEqual(['🔀 app#1 review requested'])
-  expect(await mount(26)).toEqual(['🔀 #1 review'])
+  // '🔀 app#1 review requested' is 25 wide, flush left with no padding
+  expect(await mount(25)).toEqual(['🔀 app#1 review requested'])
+  expect(await mount(24)).toEqual(['🔀 #1 review'])
   expect(await texts()).toEqual(['🔀 app#1 review requested'])
 })
 

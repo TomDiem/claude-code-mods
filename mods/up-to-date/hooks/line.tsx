@@ -5,7 +5,6 @@ import type { Segment } from './core'
 
 type Ui = ReturnType<EngineInterface['ui']['resolve']>
 
-export const PADDING = 1
 // theme keys, so the line follows the person's theme; no tone: the terminal's own text color
 const COLORS = { urgent: 'warning', alert: 'error', active: 'suggestion' } as const
 
@@ -13,9 +12,10 @@ const COLORS = { urgent: 'warning', alert: 'error', active: 'suggestion' } as co
 const style = (segment: Segment) =>
   segment.stale || segment.tone === 'muted' ? { dimColor: true } : segment.tone ? { color: COLORS[segment.tone] } : {}
 
-// what fit chose, drawn one dim separator between segments, then how many were dropped
+// what fit chose, drawn one dim separator between segments, then how many were dropped;
+// flush left, so it lines up with the other mods drawn in the band
 export const line = ({ Box, Text }: Ui, shown: { segment: Segment; text: string }[], hidden: number) => (
-  <Box paddingX={PADDING}>
+  <Box>
     {shown.flatMap(({ segment, text }, i) => [
       ...(i > 0 ? [<Text key={`${i}:sep`} dimColor>{SEPARATOR}</Text>] : []),
       <Text key={`${i}`} wrap="truncate" {...style(segment)}>
