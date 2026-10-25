@@ -14,6 +14,10 @@ export type Io = {
 // most urgent item it holds; the tone only says how loud the shell may draw it
 export type Segment = { rank: number; levels: string[]; tone?: 'urgent' | 'alert' | 'active' | 'muted'; stale?: boolean }
 
+// what the details pane lists for a source: one heading per group, a linked row per item
+export type Row = { label: string; title: string; url: string; note?: string }
+export type Group = { heading: string; rows: Row[] }
+
 type Options = Record<string, unknown>
 
 // items are plain JSON so they can be cached; text is built at render time from `now`
@@ -27,6 +31,8 @@ export type Source<I = unknown> = {
   fetch(io: Io, now: number): Promise<Fetched<I>>
   // undefined: nothing to show
   segment(items: I[], now: number, options: Options): Segment | undefined
+  // the pane's list, most urgent group first; a source without it has no pane section
+  details?(items: I[], now: number, options: Options): Group[]
 }
 
 export type Entry<I> = {

@@ -111,6 +111,27 @@ test('shows nothing when no PR needs you, and never draws a title', async () => 
   expect(JSON.stringify(await segmentOf([pr(12)], []))).not.toContain('PR 12')
 })
 
+const detailsOf = async (review: object[], mine: object[]) => {
+  const result = await fetched(answer(review, mine))
+
+  return github.details?.(result.ok ? result.items : [], 0, {})
+}
+
+test('groups the details by reason in rank order, each row linking to its PR', async () => {
+  expect(await detailsOf([pr(12)], [pr(4, changes), pr(3, failing)])).toEqual([
+    { heading: 'Review requested', rows: [{ label: 'app#12', title: 'PR 12', url: 'https://github.com/acme/app/pull/12' }] },
+    { heading: 'CI failing', rows: [{ label: 'app#3', title: 'PR 3', url: 'https://github.com/acme/app/pull/3' }] },
+    { heading: 'Changes requested', rows: [{ label: 'app#4', title: 'PR 4', url: 'https://github.com/acme/app/pull/4' }] },
+  ])
+})
+
+test('leaves out the reasons nothing matches, and marks a draft', async () => {
+  expect(await detailsOf([], [])).toEqual([])
+  expect(await detailsOf([], [pr(7, { ...failing, isDraft: true })])).toEqual([
+    { heading: 'CI failing', rows: [{ label: 'app#7', title: 'PR 7', url: 'https://github.com/acme/app/pull/7', note: 'draft' }] },
+  ])
+})
+
 test('is enabled only when the github option is on', () => {
   expect(github.enabled({ github: true })).toBe(true)
   expect(github.enabled({ github: false })).toBe(false)
