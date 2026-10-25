@@ -4,13 +4,15 @@ import type { EngineInterface, Register } from 'claude-code'
 import { due, fit, settle, status } from './core'
 import type { Entry, Io, Segment, Source } from './core'
 import { github } from './github'
+import { line, PADDING } from './line'
 
 const entries = atom({ plugin: 'up-to-date', key: 'entries' } as const, {})
 const now = atom({ plugin: 'up-to-date', key: 'now' } as const, 0)
 
 const MINUTE = 60_000
-const SEPARATOR = ' · '
 const sources: Source<any>[] = [github]
+// sorts after the rank of any real item: a source that never worked comes last
+const AFTER_ALL = 1_000
 
 const storeKey = (source: Source) => `up-to-date:v1:${source.id}`
 
@@ -73,7 +75,7 @@ const segmentOf = (
   const state = status(entry, true)
 
   if (state === 'failed') {
-    return { rank: 3, levels: [`${source.icon} ${source.id}: ${entry?.error?.reason}`], stale: true }
+    return { rank: AFTER_ALL, tone: 'muted', levels: [`${source.icon} ${source.id}: ${entry?.error?.reason}`, `${source.icon} !`] }
   }
 
   const segment = source.segment(entry?.items ?? [], time, options)
@@ -124,18 +126,18 @@ export const register: Register = (on, options) => {
     const all = await read($, entries)
     const time = await read($, now)
     const segments = enabled.flatMap(source => segmentOf(source, all[source.id], time, options) ?? [])
-    const { shown } = fit(segments, e.props.bodyColumns)
+    const { shown, hidden } = fit(segments, e.props.bodyColumns - 2 * PADDING)
 
     if (e.props.hasSurvey || shown.length === 0) {
       return rest
     }
 
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box } = $.ui.resolve(e)
 
     return (
       <Box flexDirection="column">
         {rest}
-        <Text dimColor>{shown.map(part => part.text).join(SEPARATOR)}</Text>
+        {line($.ui.resolve(e), shown, hidden)}
       </Box>
     )
   })

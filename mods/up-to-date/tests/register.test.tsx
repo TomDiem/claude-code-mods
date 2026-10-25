@@ -1,5 +1,9 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { fit } from '../hooks/core'
+import type { Segment } from '../hooks/core'
+import { line } from '../hooks/line'
+
 const MINUTE = 60_000
 const START = Date.parse('2026-10-25T12:00:00Z')
 
@@ -173,6 +177,94 @@ test('says why a source failed when it never worked', { ...github }, async ($, o
   const { texts } = await world($, on, [broken])
 
   expect(await texts()).toEqual(['🔀 github: tool-error'])
+})
+
+const texted = async ($: any) => (await (await $.ui.mount(band)).findAll({ type: 'Text' })) as any[]
+
+test('colors the segment by urgency with theme colors: warning for a review, error for failing CI', { ...github }, async ($, on) => {
+  await world($, on, [reply(1)])
+  const [review] = await texted($)
+
+  expect(review.text).toBe('🔀 app#1 review requested')
+  expect(review.props).toMatchObject({ color: 'warning' })
+  expect(review.props.dimColor).toBeFalsy()
+})
+
+test('draws failing CI in the error color',{ ...github }, async ($, on) => {
+  const item = { repo: 'app', number: 9, title: 't', url: 'u9', reason: 'ci', draft: false }
+  const entry = { items: [item], at: START, fails: 0, nextTryAt: START + 5 * MINUTE }
+  await world($, on, [reply(1)], { 'up-to-date:v1:github': entry })
+  const [ci] = await texted($)
+
+  expect(ci.text).toBe('🔀 app#9 CI failing')
+  expect(ci.props).toMatchObject({ color: 'error' })
+})
+
+test('draws a stale segment dim, not colored', { ...github }, async ($, on) => {
+  const { clock } = await world($, on, [reply(1), broken])
+
+  await clock.advance(6 * MINUTE)
+  const [stale] = await texted($)
+
+  expect(stale.text).toBe('~🔀 app#1 review requested')
+  expect(stale.props).toMatchObject({ dimColor: true })
+  expect(stale.props.color).toBeUndefined()
+})
+
+test('draws a failing source dim, with no color', { ...github }, async ($, on) => {
+  await world($, on, [broken])
+  const [failed] = await texted($)
+
+  expect(failed.text).toBe('🔀 github: tool-error')
+  expect(failed.props).toMatchObject({ dimColor: true })
+  expect(failed.props.color).toBeUndefined()
+})
+
+const segment = (rank: number, tone: Segment['tone'], ...levels: string[]): Segment => ({ rank, tone, levels })
+const reviewSegment = segment(0, 'urgent', '🔀 app#12 review requested', '🔀 #12 review', '🔀 1 PR')
+const standup = segment(1, 'active', '📅 Standup in 12 min', '📅 12 min', '📅 1')
+
+// draws what fit chooses for these segments, as the shell does, on an otherwise empty band
+const drawn = async ($: any, on: any, segments: Segment[], columns: number) => {
+  const { shown, hidden } = fit(segments, columns)
+  on('ui.render', ($: any, e: any) => line($.ui.resolve(e), shown, hidden))
+
+  return texted($)
+}
+
+test('fits the line to the body columns less the padding, down to the exact column', { ...github }, async ($, on) => {
+  const { texts } = await world($, on, [reply(1)])
+  const mount = async (bodyColumns: number) =>
+    (await (await $.ui.mount({ ...band, props: { ...band.props, bodyColumns } })).findAll({ type: 'Text' })).map((t: any) => t.text)
+
+  // '🔀 app#1 review requested' is 25 wide, plus one column of padding on each side
+  expect(await mount(27)).toEqual(['🔀 app#1 review requested'])
+  expect(await mount(26)).toEqual(['🔀 #1 review'])
+  expect(await texts()).toEqual(['🔀 app#1 review requested'])
+})
+
+test('shortens a failing source to its icon and a bang on a narrow terminal', { ...github }, async ($, on) => {
+  await world($, on, [broken])
+  const narrow = await $.ui.mount({ ...band, props: { ...band.props, bodyColumns: 8 } })
+
+  expect((await narrow.findAll({ type: 'Text' })).map((t: any) => t.text)).toEqual(['🔀 !'])
+})
+
+test('draws a dim separator between segments and colors each by its tone', async ($, on) => {
+  const [first, separator, second] = await drawn($, on, [standup, reviewSegment], 80)
+
+  expect([first.text, separator.text, second.text]).toEqual(['🔀 app#12 review requested', ' · ', '📅 Standup in 12 min'])
+  expect(separator.props).toMatchObject({ dimColor: true })
+  expect(first.props).toMatchObject({ color: 'warning' })
+  expect(second.props).toMatchObject({ color: 'suggestion' })
+})
+
+test('says how many segments were dropped, dim, after the ones that fit', async ($, on) => {
+  // '🔀 1 PR' is 6 wide and ' · +1' is 5
+  const parts = await drawn($, on, [reviewSegment, standup], 12)
+
+  expect(parts.map(t => t.text)).toEqual(['🔀 1 PR', ' · +1'])
+  expect(parts[1].props).toMatchObject({ dimColor: true })
 })
 
 test('stacks under another mod and leaves a survey alone', { ...github }, async ($, on) => {
