@@ -7,6 +7,11 @@
       "name": "usage-meter",
       "source": "./mods/usage-meter",
       "description": "Live context, rate limit and cost meter above the prompt"
+    },
+    {
+      "name": "up-to-date",
+      "source": "./mods/up-to-date",
+      "description": "One line above the prompt showing what needs you, from sources you opt into"
     }
   ]
 }

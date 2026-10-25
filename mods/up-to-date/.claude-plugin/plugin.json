@@ -4,6 +4,7 @@
   "description": "One line above the prompt showing what needs you, from sources you opt into",
   "author": { "name": "TomDiem" },
   "license": "MIT",
+  "types": "./types/index.d.ts",
   "userConfig": {
     "github": {
       "type": "boolean",
