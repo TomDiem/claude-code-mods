@@ -3,24 +3,26 @@
 One line above the prompt showing what needs you, from sources you opt in to.
 
 ```
-review app#12 · ci app#3 · changes app#4 · +2
+🔀 app#12 review requested +2
 ```
+
+One segment per source, led by its icon and showing its most urgent item, with `+N` for the rest. Segments are colored by urgency with your theme's `warning` and `error` colors: warning for a review request, error for failing CI.
 
 ## What it shows
 
-| Source | Items, most urgent first |
-|--------|--------------------------|
-| GitHub | `review`: a review is requested from you. `ci`: your open PR has failing CI (drafts last). `changes`: your open PR has changes requested |
+| Source | Icon | Most urgent item, in order |
+|--------|------|----------------------------|
+| GitHub | 🔀 | `review requested`: a review is requested from you (warning). `CI failing`: your open PR has failing CI, drafts last (error). `changes requested`: your open PR has changes requested |
 
-- A PR that matches several reasons shows once, under the most urgent.
-- What does not fit the terminal width collapses to `+N`.
-- `~` before an item means the source is failing and the item is the last good result. A source that never worked shows `github: <reason>` (`not-connected`, `tool-error`, `parse-error` or `timeout`).
+- A PR that matches several reasons counts once, under the most urgent.
+- On a narrow terminal the least urgent source shortens fully first (`🔀 #12 review +2`, then `🔀 3 PRs`), then the next one up. Only when every source is at its shortest does the least urgent get dropped, shown as ` · +N` for the N dropped.
+- `~` before a segment (drawn dim) means the source is failing and the segment is the last good result. A source that never worked shows `🔀 github: <reason>` dim, or `🔀 !` when there is no room (`not-connected`, `tool-error`, `parse-error` or `timeout`).
 - Failing sources back off instead of retrying every minute.
 - `changes` relies on GitHub's review decision, which is empty on repos without required reviews, so those PRs never show it.
 
 ## Enable sources
 
-Every source is off by default, so a fresh install fetches and draws nothing. Turn one on in `/config`, under the plugin's settings:
+Every source is off by default, so a fresh install fetches and draws nothing. Turn one on with `/plugin configure up-to-date@tomdiem-mods`:
 
 | Setting | Source |
 |---------|--------|
