@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import { due, fit, settle, status } from './core'
-import type { Entry, Io, Line, Source } from './core'
+import type { Entry, Io, Segment, Source } from './core'
 import { github } from './github'
 
 const entries = atom({ plugin: 'up-to-date', key: 'entries' } as const, {})
@@ -64,14 +64,21 @@ const refresh = async ($: EngineInterface, source: Source, time: number) => {
 }
 
 // a source that never worked says why; one that did keeps its last items, marked stale
-const linesOf = (source: Source, entry: Entry<unknown> | undefined, time: number, options: Record<string, unknown>): Line[] => {
-  if (status(entry, true) === 'failed') {
-    return [{ rank: 3, text: `${source.id}: ${entry?.error?.reason}`, detail: '' }]
+const segmentOf = (
+  source: Source,
+  entry: Entry<unknown> | undefined,
+  time: number,
+  options: Record<string, unknown>,
+): Segment | undefined => {
+  const state = status(entry, true)
+
+  if (state === 'failed') {
+    return { rank: 3, levels: [`${source.icon} ${source.id}: ${entry?.error?.reason}`], stale: true }
   }
 
-  const mark = status(entry, true) === 'stale' ? '~' : ''
+  const segment = source.segment(entry?.items ?? [], time, options)
 
-  return source.lines(entry?.items ?? [], time, options).map(line => ({ ...line, text: mark + line.text }))
+  return segment && state === 'stale' ? { ...segment, stale: true, levels: segment.levels.map(level => `~${level}`) } : segment
 }
 
 export const register: Register = (on, options) => {
@@ -116,8 +123,8 @@ export const register: Register = (on, options) => {
     const rest = await next(e)
     const all = await read($, entries)
     const time = await read($, now)
-    const lines = enabled.flatMap(source => linesOf(source, all[source.id], time, options))
-    const { shown, hidden } = fit(lines, e.props.bodyColumns)
+    const segments = enabled.flatMap(source => segmentOf(source, all[source.id], time, options) ?? [])
+    const { shown } = fit(segments, e.props.bodyColumns)
 
     if (e.props.hasSurvey || shown.length === 0) {
       return rest
@@ -128,7 +135,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         {rest}
-        <Text dimColor>{shown.join(SEPARATOR) + (hidden > 0 ? `${SEPARATOR}+${hidden}` : '')}</Text>
+        <Text dimColor>{shown.map(part => part.text).join(SEPARATOR)}</Text>
       </Box>
     )
   })

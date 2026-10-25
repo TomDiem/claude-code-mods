@@ -64,14 +64,14 @@ test('draws nothing and runs nothing while no source is enabled', async ($, on) 
 test('draws the GitHub line, refetching only once the ttl has passed', { ...github }, async ($, on) => {
   const { clock, texts, calls } = await world($, on, [reply(1), reply(2)])
 
-  expect(await texts()).toEqual(['review app#1'])
+  expect(await texts()).toEqual(['🔀 app#1 review requested'])
 
   await clock.advance(4 * MINUTE)
   expect(calls()).toBe(1)
 
   await clock.advance(2 * MINUTE)
   expect(calls()).toBe(2)
-  expect(await texts()).toEqual(['review app#2'])
+  expect(await texts()).toEqual(['🔀 app#2 review requested'])
 })
 
 test('uses a fresh cached entry instead of fetching', { ...github }, async ($, on) => {
@@ -79,7 +79,7 @@ test('uses a fresh cached entry instead of fetching', { ...github }, async ($, o
   const entry = { items: [item], at: START, fails: 0, nextTryAt: START + 5 * MINUTE }
   const { clock, texts, calls } = await world($, on, [reply(1)], { 'up-to-date:v1:github': entry })
 
-  expect(await texts()).toEqual(['ci app#9'])
+  expect(await texts()).toEqual(['🔀 app#9 CI failing'])
 
   await clock.advance(MINUTE)
   expect(calls()).toBe(0)
@@ -91,7 +91,7 @@ test('marks a failing source stale and backs off', { ...github }, async ($, on) 
   // the ttl is 5 minutes give or take jitter, so the failure lands on minute 5 or 6
   await clock.advance(6 * MINUTE)
   expect(calls()).toBe(2)
-  expect(await texts()).toEqual(['~review app#1'])
+  expect(await texts()).toEqual(['~🔀 app#1 review requested'])
 
   // the retry waits for the backoff (10 minutes after the failure), not the next tick
   await clock.advance(8 * MINUTE)
@@ -99,7 +99,7 @@ test('marks a failing source stale and backs off', { ...github }, async ($, on) 
 
   await clock.advance(2 * MINUTE)
   expect(calls()).toBe(3)
-  expect(await texts()).toEqual(['review app#2'])
+  expect(await texts()).toEqual(['🔀 app#2 review requested'])
 })
 
 test('does not wait for the first fetch to start the session', { ...github }, async ($, on) => {
@@ -165,21 +165,21 @@ for (const [what, entry] of Object.entries(malformed)) {
     const { texts, calls } = await world($, on, [reply(1)], { 'up-to-date:v1:github': entry })
 
     expect(calls()).toBe(1)
-    expect(await texts()).toEqual(['review app#1'])
+    expect(await texts()).toEqual(['🔀 app#1 review requested'])
   })
 }
 
 test('says why a source failed when it never worked', { ...github }, async ($, on) => {
   const { texts } = await world($, on, [broken])
 
-  expect(await texts()).toEqual(['github: tool-error'])
+  expect(await texts()).toEqual(['🔀 github: tool-error'])
 })
 
 test('stacks under another mod and leaves a survey alone', { ...github }, async ($, on) => {
   const other = ($: any, e: any) => $.ui.resolve(e).Text({ children: 'other' })
   const { texts } = await world($, on, [reply(1)], undefined, other)
 
-  expect(await texts()).toEqual(['other', 'review app#1'])
+  expect(await texts()).toEqual(['other', '🔀 app#1 review requested'])
 
   const survey = await $.ui.mount({ ...band, props: { ...band.props, hasSurvey: true } })
   expect((await survey.findAll({ type: 'Text' })).map((t: any) => t.text)).toEqual(['other'])
