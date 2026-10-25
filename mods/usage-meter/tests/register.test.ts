@@ -14,8 +14,12 @@ const band = {
   },
 } as const
 
+// stands in for the engine drawing beneath the plugins
+const empty = ($: any, e: any) => $.ui.resolve(e).Box({})
+
 test('draws context, rate limits and cost, and counts down to the reset', async ($, on) => {
   const clock = mock.clock(on, { now: Date.parse('2026-10-24T12:00:00Z') })
+  on('ui.render', empty)
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
 
@@ -47,6 +51,7 @@ test('shows what the last main turn added', async ($, on) => {
       cost: { usd: current.usd },
     },
   }))
+  on('ui.render', empty)
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
 
@@ -76,4 +81,42 @@ test('warns once when the context crosses 80%', async ($, on) => {
   }
 
   expect(toasts).toEqual(['Context at 82%: consider /compact'])
+})
+
+const measured = {
+  context: { tokens: 116_000, window: 200_000, percent: 58 },
+  rateLimits: [],
+  changed: ['context'],
+} as const
+
+const other = ($: any, e: any) => {
+  const { Text } = $.ui.resolve(e)
+  return Text({ children: 'other' })
+}
+
+test('stacks under another mod instead of replacing it', async ($, on) => {
+  on('ui.render', other)
+  on('session.measure', (_, e) => ({ changed: e.changed }))
+  await $.session.measure(measured)
+
+  const ui = await $.ui.mount(band)
+
+  expect((await ui.find({ type: 'Text', text: 'other' }))?.text).toBe('other')
+  expect((await ui.find({ type: 'Text', text: /^ctx / }))?.text).toBe('ctx ▓▓▓▓▓▓░░░░ 58% (116k/200k)')
+})
+
+test('keeps the other mod visible when there is nothing to draw or a survey is up', async ($, on) => {
+  on('ui.render', other)
+  on('session.measure', (_, e) => ({ changed: e.changed }))
+
+  // nothing measured yet: only the other mod draws
+  const unmeasured = await $.ui.mount(band)
+  expect((await unmeasured.find({ type: 'Text', text: 'other' }))?.text).toBe('other')
+  expect(await unmeasured.find({ type: 'Text', text: /^ctx / })).toBeUndefined()
+
+  // survey up: usage-meter stays out of the way, the other mod still draws
+  await $.session.measure(measured)
+  const survey = await $.ui.mount({ ...band, props: { ...band.props, hasSurvey: true } })
+  expect((await survey.find({ type: 'Text', text: 'other' }))?.text).toBe('other')
+  expect(await survey.find({ type: 'Text', text: /^ctx / })).toBeUndefined()
 })

@@ -113,19 +113,21 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const rest = await next(e)
     const current = await read($, usage)
     const turn = await read($, last)
     const summary = current ? totals(current, await read($, now)) : ''
     const change = turn ? delta(turn) : ''
 
     if (e.props.hasSurvey || (!summary && !change)) {
-      return next(e)
+      return rest
     }
 
     const { Box, Text } = $.ui.resolve(e)
 
     return (
       <Box flexDirection="column">
+        {rest}
         {summary ? <Text dimColor>{summary}</Text> : null}
         {change ? <Text dimColor>{change}</Text> : null}
       </Box>
