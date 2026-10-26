@@ -112,10 +112,10 @@ test('settle keeps the last good items on failure and backs off exponentially up
     at: NOW - TTL,
     error: { reason: 'timeout', at: NOW },
     fails: 1,
-    nextTryAt: NOW + 2 * TTL,
+    nextTryAt: NOW + TTL,
   })
-  expect(second.nextTryAt).toBe(NOW + 4 * TTL)
-  expect(third.nextTryAt).toBe(NOW + 30 * MINUTE)
+  expect(second.nextTryAt).toBe(NOW + 2 * TTL)
+  expect(third.nextTryAt).toBe(NOW + 4 * TTL)
   expect(fourth.nextTryAt).toBe(NOW + 30 * MINUTE)
 })
 
@@ -133,7 +133,7 @@ test('settle clears the error and the backoff once a fetch succeeds again', () =
     at: 0,
     error: { reason: 'not-connected', at: NOW },
     fails: 1,
-    nextTryAt: NOW + 2 * TTL,
+    nextTryAt: NOW + TTL,
   })
   expect(settle(failed, { ok: true, items: ['b'] }, NOW + 1, TTL)).toEqual({
     items: ['b'],

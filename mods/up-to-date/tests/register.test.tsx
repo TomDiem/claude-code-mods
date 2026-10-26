@@ -97,11 +97,11 @@ test('marks a failing source stale and backs off', { ...github }, async ($, on) 
   expect(calls()).toBe(2)
   expect(await texts()).toEqual(['~🔀 app#1 review requested'])
 
-  // the retry waits for the backoff (10 minutes after the failure), not the next tick
-  await clock.advance(8 * MINUTE)
+  // the retry waits for the backoff (5 minutes after the failure), not the next tick
+  await clock.advance(3 * MINUTE)
   expect(calls()).toBe(2)
 
-  await clock.advance(2 * MINUTE)
+  await clock.advance(3 * MINUTE)
   expect(calls()).toBe(3)
   expect(await texts()).toEqual(['🔀 app#2 review requested'])
 })

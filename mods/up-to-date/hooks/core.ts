@@ -102,7 +102,7 @@ export const fit = (segments: Segment[], columns: number) => {
   return { shown: first ? [{ segment: first, text: first.levels[first.levels.length - 1] ?? '' }] : [], hidden: 0 }
 }
 
-// a failure keeps the last good items (stale) and backs off: ttl * 2^fails, capped,
+// a failure keeps the last good items (stale) and backs off: ttl * 2^(fails - 1), capped,
 // but never retries sooner than a healthy source would
 export const settle = <I>(
   prev: Entry<I> | undefined,
@@ -122,7 +122,7 @@ export const settle = <I>(
     at: prev?.at ?? 0,
     error: { reason: result.reason, at: now },
     fails,
-    nextTryAt: now + Math.min(ttlMs * 2 ** fails, Math.max(ttlMs, MAX_BACKOFF)),
+    nextTryAt: now + Math.min(ttlMs * 2 ** (fails - 1), Math.max(ttlMs, MAX_BACKOFF)),
   }
 }
 
