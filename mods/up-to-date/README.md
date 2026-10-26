@@ -62,7 +62,7 @@ Linear and Slack are coming.
 
 ## Access
 
-Calendar calls the `list_events` tool of your `claude.ai Google Calendar` connector (read-only) every 10 minutes. Event titles are cached locally like PR titles and appear in the line and the pane.
+Calendar calls the `list_events` tool of your `claude.ai Google Calendar` connector (read-only) every 5 minutes, or every 2 minutes while a meeting is in progress or starts within 30 minutes, so a moved event is picked up quickly. Event titles are cached locally like PR titles and appear in the line and the pane.
 
 GitHub runs `gh api graphql` (read-only search of your PRs) every few minutes, only while the source is enabled and only in interactive sessions (not `-p` or the SDK). Results, including PR titles from private repos, are cached locally in the plugin's store under the Claude config directory so sessions share them; the line shows only `repo#number`; titles appear only in the details pane. No model calls, no cost.
 

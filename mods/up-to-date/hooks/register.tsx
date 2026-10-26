@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import { due, fit, settle, status } from './core'
+import { due, fit, settle, status, ttlOf } from './core'
 import type { Entry, Io, Segment, Source } from './core'
 import { calendar } from './calendar'
 import { details } from './details'
@@ -62,7 +62,9 @@ const refresh = async ($: EngineInterface, source: Source, time: number) => {
   }
 
   if (due(entry, time)) {
-    entry = settle(entry, await source.fetch(ioOf($), time), time, source.ttlMs, jitter())
+    const result = await source.fetch(ioOf($), time)
+
+    entry = settle(entry, result, time, ttlOf(source, result, time), jitter())
     await toStore($, source, entry)
   }
 

@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { cells, due, fit, settle, status } from '../hooks/core'
-import type { Entry, Fetched, Segment } from '../hooks/core'
+import { cells, due, fit, settle, status, ttlOf } from '../hooks/core'
+import type { Entry, Fetched, Segment, Source } from '../hooks/core'
 
 const MINUTE = 60_000
 const TTL = 5 * MINUTE
@@ -167,4 +167,14 @@ test('status is stale, not failed, when the last good fetch found nothing', () =
   const empty: Entry<string> = { items: [], at: NOW - TTL, error: { reason: 'timeout', at: NOW }, fails: 1, nextTryAt: NOW + TTL }
 
   expect(status(empty, true)).toBe('stale')
+})
+
+test('takes the ttl a source works out from what it fetched, else its fixed one', () => {
+  const source = { ttlMs: TTL } as unknown as Source<number>
+  const adaptive = { ttlMs: TTL, ttl: (items: number[]) => items.length * MINUTE } as unknown as Source<number>
+  const failed: Fetched<number> = { ok: false, reason: 'tool-error' }
+
+  expect(ttlOf(source, { ok: true, items: [1] }, NOW)).toBe(TTL)
+  expect(ttlOf(adaptive, { ok: true, items: [1, 2] }, NOW)).toBe(2 * MINUTE)
+  expect(ttlOf(adaptive, failed, NOW)).toBe(TTL)
 })

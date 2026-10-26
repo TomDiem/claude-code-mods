@@ -8,7 +8,10 @@ const ICON = '📅'
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const SOON = 15 * MINUTE
+// a meeting that is on or near is where a moved event would hurt, so look more often
+const NEAR_TTL = 2 * MINUTE
 const MAX_BLOCK_HOURS = 3
+const CALENDAR_TTL = 5 * MINUTE
 // the countdown is rounded up, so it reads "in 59m" at most and the clock time takes over after
 const COUNTDOWN = 59 * MINUTE
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -134,6 +137,9 @@ const segment = (items: Meeting[], now: number, options: Record<string, unknown>
   }
 }
 
+const ttl = (items: Meeting[], now: number) =>
+  upcoming(items, now, {}).some(item => item.start - now <= 30 * MINUTE) ? NEAR_TTL : CALENDAR_TTL
+
 const details = (items: Meeting[], now: number, options: Record<string, unknown>): Group[] => {
   const rows = upcoming(items, now, options).map(item => ({ label: when(item, now), title: item.title, url: item.url }))
 
@@ -144,7 +150,8 @@ export const calendar: Source<Meeting> = {
   id: 'calendar',
   label: 'Calendar',
   icon: ICON,
-  ttlMs: 10 * MINUTE,
+  ttlMs: CALENDAR_TTL,
+  ttl,
   enabled: options => options.calendar === true,
   fetch: fetchMeetings,
   segment,

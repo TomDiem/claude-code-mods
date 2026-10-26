@@ -208,6 +208,17 @@ test('counts down from the time it is given, with no refetch', () => {
   expect(segmentOf(items, at(12, 12))?.levels[0]).toBe('📅 now: Standup')
 })
 
+test('refreshes every 2 minutes while a meeting is in progress or within 30 minutes, else every 5', () => {
+  const ttl = (...items: object[]) => calendar.ttl?.(items as never[], NOW)
+
+  expect(ttl(item('a', at(11, 30), at(12, 30)))).toBe(2 * MINUTE)
+  expect(ttl(item('a', NOW + 29 * MINUTE, NOW + 2 * HOUR))).toBe(2 * MINUTE)
+  expect(ttl(item('a', NOW + 30 * MINUTE, NOW + 2 * HOUR))).toBe(2 * MINUTE)
+  expect(ttl(item('a', NOW + 31 * MINUTE, NOW + 2 * HOUR))).toBe(5 * MINUTE)
+  expect(ttl(item('ended', at(10), at(11, 59)))).toBe(5 * MINUTE)
+  expect(ttl()).toBe(5 * MINUTE)
+})
+
 test('lists the meetings in the details by start, each linking to its event', () => {
   const items = [item('b', at(15), at(16), 'Review'), item('a', at(11, 30), at(12, 30), 'Standup'), item('x', at(9), at(10))]
 
