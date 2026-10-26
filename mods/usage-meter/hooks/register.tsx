@@ -45,7 +45,7 @@ const totals = ({ context, rateLimits, usd }: Usage, time: number) => {
 
   for (const { kind, percentUsed, resetsAt } of rateLimits) {
     const reset = resetsAt ? ` (resets ${duration(Date.parse(resetsAt) - time)})` : ''
-    parts.push(`${LABELS[kind] ?? kind} ${percentUsed}%${reset}`)
+    parts.push(`${LABELS[kind] ?? kind}: ${percentUsed}%${reset}`)
   }
 
   if (usd !== undefined) {

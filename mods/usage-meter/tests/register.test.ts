@@ -39,7 +39,7 @@ test('draws context, rate limits and cost, and counts down to the reset', async 
 
   // only the context keeps a bar; the rate limits read as plain percentages
   expect(await text()).toBe(
-    'ctx ▓▓▓▓▓▓░░░░ 58% (116k/200k)  ·  5h 23% (resets 2h14m)  ·  7d 65% (resets 1d17h)  ·  $1.84',
+    'ctx ▓▓▓▓▓▓░░░░ 58% (116k/200k)  ·  5h: 23% (resets 2h14m)  ·  7d: 65% (resets 1d17h)  ·  $1.84',
   )
 
   await clock.advance(60_000)
