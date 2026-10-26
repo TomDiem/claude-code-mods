@@ -1,4 +1,4 @@
-import type { Fetched, Io, Reason, Segment, Source } from './core'
+import type { Fetched, Group, Io, Reason, Segment, Source } from './core'
 
 type Why = 'review' | 'ci' | 'changes'
 
@@ -7,6 +7,7 @@ export type Pr = { repo: string; number: number; title: string; url: string; rea
 
 const TIMEOUT_MS = 15_000
 const ICON = '🔀'
+const ORDER: Why[] = ['review', 'ci', 'changes']
 const RANK: Record<Why, number> = { review: 0, ci: 1, changes: 2 }
 const TONE: Record<Why, Segment['tone']> = { review: 'urgent', ci: 'alert', changes: undefined }
 // the full label, then the short one for a narrow terminal
@@ -15,6 +16,7 @@ const LABELS: Record<Why, [string, string]> = {
   ci: ['CI failing', 'CI'],
   changes: ['changes requested', 'changes'],
 }
+const HEADINGS: Record<Why, string> = { review: 'Review requested', ci: 'CI failing', changes: 'Changes requested' }
 
 // one round trip: reviews asked of me, and my open PRs with their CI and review state
 const QUERY = `query {
@@ -136,6 +138,16 @@ const segment = (items: Pr[]): Segment | undefined => {
   }
 }
 
+// one group per reason, most urgent first
+const details = (items: Pr[]): Group[] =>
+  ORDER.flatMap(reason => {
+    const rows = items
+      .filter(item => item.reason === reason)
+      .map(({ repo, number, title, url, draft }) => ({ label: `${repo}#${number}`, title, url, ...(draft && { note: 'draft' }) }))
+
+    return rows.length > 0 ? [{ heading: HEADINGS[reason], rows }] : []
+  })
+
 export const github: Source<Pr> = {
   id: 'github',
   label: 'GitHub',
@@ -144,4 +156,5 @@ export const github: Source<Pr> = {
   enabled: options => options.github === true,
   fetch: fetchPrs,
   segment,
+  details,
 }

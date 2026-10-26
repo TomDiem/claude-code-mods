@@ -227,7 +227,7 @@ const standup = segment(1, 'active', '📅 Standup in 12 min', '📅 12 min', '�
 // draws what fit chooses for these segments, as the shell does, on an otherwise empty band
 const drawn = async ($: any, on: any, segments: Segment[], columns: number) => {
   const { shown, hidden } = fit(segments, columns)
-  on('ui.render', ($: any, e: any) => line($.ui.resolve(e), shown, hidden))
+  on('ui.render', ($: any, e: any) => line($.ui.resolve(e), shown, hidden, () => {}))
 
   return texted($)
 }
@@ -275,4 +275,134 @@ test('stacks under another mod and leaves a survey alone', { ...github }, async 
 
   const survey = await $.ui.mount({ ...band, props: { ...band.props, hasSurvey: true } })
   expect((await survey.findAll({ type: 'Text' })).map((t: any) => t.text)).toEqual(['other'])
+})
+
+const opened = (on: any) => {
+  const calls: any[] = []
+  on('ui.open', (_: any, e: any) => {
+    calls.push(e)
+    return { value: { isPlaced: true } }
+  })
+
+  return calls
+}
+
+const pane = {
+  plugin: 'up-to-date',
+  surface: 'terminal',
+  component: 'Pane',
+  requestId: 'up-to-date',
+  props: { title: 'Up to date', isFocused: true, bodyColumns: 60, placement: 'inline', scroll: { offset: 0, bodyRows: 10 }, view: {} },
+} as const
+
+// a row is the Text holding the indent, the link (its text leads with the href) and the dim title
+const body = async ($: any) => {
+  const mounted = await $.ui.mount(pane)
+  const texts: string[] = (await mounted.findAll({ type: 'Text' })).map((t: any) => t.text as string)
+
+  return {
+    texts,
+    links: (await mounted.findAll({ type: 'Link' })).map((l: any) => [l.text.replace(l.props.href, ''), l.props.href]),
+    row: async (url: string) => texts.find(text => text.includes(url)),
+  }
+}
+
+test('draws the line as one plain button, so a click on any part of it presses', { ...github }, async ($, on) => {
+  await world($, on, [reply(1)])
+  const buttons = await (await $.ui.mount(band)).findAll({ type: 'Button' })
+
+  expect(buttons).toHaveLength(1)
+  expect(buttons[0]?.key).toBe('up-to-date:line')
+  expect(buttons[0]?.props).toMatchObject({ plain: true })
+})
+
+test('opens the details pane, closed by Escape, when the line is pressed', { ...github }, async ($, on) => {
+  const calls = opened(on)
+  await world($, on, [reply(1)])
+
+  await (await $.ui.mount(band)).press({ key: 'up-to-date:line' })
+
+  expect(calls).toEqual([expect.objectContaining({ id: 'up-to-date', title: 'Up to date', focus: true, closeOnEscape: true })])
+})
+
+test('lists the items in the pane, each linking to its PR, from what is already fetched', { ...github }, async ($, on) => {
+  const items = [
+    { repo: 'app', number: 9, title: 'Fix login', url: 'https://github.com/acme/app/pull/9', reason: 'ci', draft: true },
+    { repo: 'app', number: 4, title: 'Add search', url: 'https://github.com/acme/app/pull/4', reason: 'review', draft: false },
+  ]
+  const entry = { items, at: START, fails: 0, nextTryAt: START + 5 * MINUTE }
+  const { calls } = await world($, on, [reply(1)], { 'up-to-date:v1:github': entry })
+  const { texts, links, row } = await body($)
+
+  expect(texts.filter(text => text.startsWith('🔀'))).toEqual(['🔀 Review requested', '🔀 CI failing'])
+  expect(links).toEqual([
+    ['app#4', 'https://github.com/acme/app/pull/4'],
+    ['app#9', 'https://github.com/acme/app/pull/9'],
+  ])
+  expect(texts).toContain(' Add search')
+  expect(texts).toContain(' Fix login (draft)')
+  expect(await row('https://github.com/acme/app/pull/4')).toMatch(/^ {2}[^ ]/)
+  expect(calls()).toBe(0)
+})
+
+test('draws no trailing space for a PR without a title', { ...github }, async ($, on) => {
+  const item = { repo: 'app', number: 4, title: '', url: 'u4', reason: 'review', draft: false }
+  const entry = { items: [item], at: START, fails: 0, nextTryAt: START + 5 * MINUTE }
+  await world($, on, [reply(1)], { 'up-to-date:v1:github': entry })
+  const { row } = await body($)
+
+  expect(await row('u4')).toBe('  u4app#4')
+})
+
+test('says dimly how old a stale source is', { ...github }, async ($, on) => {
+  const { clock } = await world($, on, [reply(1), broken])
+
+  await clock.advance(6 * MINUTE)
+
+  expect((await body($)).texts).toContain('GitHub: last updated 6 min ago')
+})
+
+test('still says how old a stale source is when its last good fetch was empty', { ...github }, async ($, on) => {
+  const { clock } = await world($, on, [reply(), broken])
+
+  await clock.advance(6 * MINUTE)
+
+  expect((await body($)).texts).toEqual(['🔀 GitHub: last updated 6 min ago'])
+})
+
+test('says it is checking while the first fetch has not landed', { ...github }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.store(on)
+  on('ui.render', empty)
+  on('session.start', (_: any, e: any) => ({ cwd: e.cwd }))
+  on('process.run', () => new Promise(() => {}))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.advance(0)
+
+  expect((await body($)).texts).toEqual(['🔀 GitHub: checking…'])
+})
+
+test('says why a source that never worked has nothing to list', { ...github }, async ($, on) => {
+  await world($, on, [broken])
+
+  expect((await body($)).texts).toEqual(['🔀 GitHub: tool-error'])
+})
+
+test('says nothing needs you when every enabled source is fine and empty', { ...github }, async ($, on) => {
+  await world($, on, [reply()])
+
+  expect((await body($)).texts).toEqual(['Nothing needs you.'])
+})
+
+test('says nothing needs you when no source is enabled', async ($, on) => {
+  await world($, on, [reply(1)])
+
+  expect((await body($)).texts).toEqual(['Nothing needs you.'])
+})
+
+test('draws nothing for a pane that is not its own', { ...github }, async ($, on) => {
+  await world($, on, [reply(1)])
+  const other = await $.ui.mount({ ...pane, requestId: 'other' })
+
+  expect(await other.findAll({ type: 'Link' })).toEqual([])
 })
