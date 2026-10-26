@@ -156,6 +156,31 @@ test('polls only in an interactive session', { ...github }, async ($, on) => {
   expect(calls()).toBe(0)
 })
 
+const calendar = { options: { calendar: true } }
+
+test('fetches only Calendar when only Calendar is enabled, and counts down on the minute tick', { ...calendar }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.store(on)
+  on('ui.render', empty)
+  on('session.start', (_: any, e: any) => ({ cwd: e.cwd }))
+
+  let runs = 0
+  let asked = 0
+  const standup = { id: 's', summary: 'Standup', htmlLink: 'u', start: { dateTime: new Date(START + 12 * MINUTE).toISOString() }, end: { dateTime: new Date(START + 42 * MINUTE).toISOString() } }
+  on('process.run', () => ({ value: (runs++, reply(1)) }))
+  on('mcp.call', () => ({ value: (asked++, { content: [{ type: 'text', text: JSON.stringify({ events: [standup] }) }], isError: false }) }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.advance(0)
+
+  const texts = async () => (await (await $.ui.mount(band)).findAll({ type: 'Text' })).map((t: any) => t.text)
+
+  expect(await texts()).toEqual(['📅 in 12m: Standup'])
+
+  await clock.advance(MINUTE)
+  expect(await texts()).toEqual(['📅 in 11m: Standup'])
+  expect([runs, asked]).toEqual([0, 1])
+})
+
 const nextTryAt = START + 5 * MINUTE
 const malformed = {
   'items that are not a list': { items: 'oops', at: START, fails: 0, nextTryAt },
@@ -218,6 +243,45 @@ test('draws a failing source dim, with no color', { ...github }, async ($, on) =
   expect(failed.text).toBe('🔀 github: tool-error')
   expect(failed.props).toMatchObject({ dimColor: true })
   expect(failed.props.color).toBeUndefined()
+})
+
+test('refetches Calendar after 2 minutes when a meeting is within 30 minutes', { ...calendar }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.store(on)
+  on('ui.render', empty)
+  on('session.start', (_: any, e: any) => ({ cwd: e.cwd }))
+
+  let asked = 0
+  const soon = { id: 's', summary: 'Standup', htmlLink: 'u', start: { dateTime: new Date(START + 20 * MINUTE).toISOString() }, end: { dateTime: new Date(START + 60 * MINUTE).toISOString() } }
+  on('mcp.call', () => ({ value: (asked++, { content: [{ type: 'text', text: JSON.stringify({ events: [soon] }) }], isError: false }) }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.advance(0)
+  expect(asked).toBe(1)
+
+  // the 2 minute ttl is 1.8 to 2.2 minutes with jitter: by the third tick it is due
+  await clock.advance(3 * MINUTE)
+  expect(asked).toBe(2)
+})
+
+test('does not call the connector while Calendar is disabled', { ...github }, async ($, on) => {
+  let asked = 0
+  on('mcp.call', () => ({ value: (asked++, { content: [], isError: false }) }))
+  const { clock } = await world($, on, [reply(1)])
+
+  await clock.advance(10 * MINUTE)
+
+  expect(asked).toBe(0)
+})
+
+test('says why Calendar failed when it never worked, dim like GitHub', { ...calendar }, async ($, on) => {
+  on('mcp.call', () => {
+    throw new Error('the host refused the call')
+  })
+  await world($, on, [reply(1)])
+  const [failed] = await texted($)
+
+  expect(failed.text).toBe('📅 calendar: tool-error')
+  expect(failed.props).toMatchObject({ dimColor: true })
 })
 
 const segment = (rank: number, tone: Segment['tone'], ...levels: string[]): Segment => ({ rank, tone, levels })

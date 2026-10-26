@@ -1,8 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import { due, fit, settle, status } from './core'
+import { due, fit, settle, status, ttlOf } from './core'
 import type { Entry, Io, Segment, Source } from './core'
+import { calendar } from './calendar'
 import { details } from './details'
 import type { Section } from './details'
 import { github } from './github'
@@ -13,7 +14,7 @@ const now = atom({ plugin: 'up-to-date', key: 'now' } as const, 0)
 
 const MINUTE = 60_000
 const PANE = 'up-to-date'
-const sources: Source<any>[] = [github]
+const sources: Source<any>[] = [github, calendar]
 // sorts after the rank of any real item: a source that never worked comes last
 const AFTER_ALL = 1_000
 
@@ -61,7 +62,9 @@ const refresh = async ($: EngineInterface, source: Source, time: number) => {
   }
 
   if (due(entry, time)) {
-    entry = settle(entry, await source.fetch(ioOf($), time), time, source.ttlMs, jitter())
+    const result = await source.fetch(ioOf($), time)
+
+    entry = settle(entry, result, time, ttlOf(source, result, time), jitter())
     await toStore($, source, entry)
   }
 

@@ -27,6 +27,8 @@ export type Source<I = unknown> = {
   // leads the source's segment, also when it only says why it is failing
   icon: string
   ttlMs: number
+  // a shorter (or longer) wait worked out from what was just fetched; absent: ttlMs
+  ttl?(items: I[], now: number): number
   enabled(options: Options): boolean
   fetch(io: Io, now: number): Promise<Fetched<I>>
   // undefined: nothing to show
@@ -123,6 +125,10 @@ export const settle = <I>(
     nextTryAt: now + Math.min(ttlMs * 2 ** fails, Math.max(ttlMs, MAX_BACKOFF)),
   }
 }
+
+// how long a good fetch stays fresh; a failure backs off from the fixed ttlMs
+export const ttlOf = <I>(source: Source<I>, result: Fetched<I>, now: number) =>
+  (result.ok && source.ttl?.(result.items, now)) || source.ttlMs
 
 export const due = (entry: Entry<unknown> | undefined, now: number) => !entry || now >= entry.nextTryAt
 

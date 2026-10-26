@@ -1,6 +1,6 @@
 {
   "name": "up-to-date",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "One line above the prompt showing what needs you, from sources you opt into",
   "author": { "name": "TomDiem" },
   "license": "MIT",
@@ -11,6 +11,18 @@
       "title": "GitHub",
       "description": "Show review requests, failing CI and requested changes on your pull requests (needs gh)",
       "default": false
+    },
+    "calendar": {
+      "type": "boolean",
+      "title": "Google Calendar",
+      "description": "Show your next meeting and the countdown to it (needs the claude.ai Google Calendar connector)",
+      "default": false
+    },
+    "calendarMaxBlockHours": {
+      "type": "number",
+      "title": "Calendar: longest meeting",
+      "description": "Ignore calendar events longer than this many hours, such as focus blocks",
+      "default": 3
     }
   }
 }
