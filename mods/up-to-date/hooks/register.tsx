@@ -14,7 +14,8 @@ const now = atom({ plugin: 'up-to-date', key: 'now' } as const, 0)
 
 const MINUTE = 60_000
 const PANE = 'up-to-date'
-const sources: Source<any>[] = [github, calendar]
+// source order breaks ties in rank and orders the pane: a meeting does not wait, a review can
+const sources: Source<any>[] = [calendar, github]
 // sorts after the rank of any real item: a source that never worked comes last
 const AFTER_ALL = 1_000
 
