@@ -26,7 +26,10 @@ test('draws context, rate limits and cost, and counts down to the reset', async 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.session.measure({
     context: { tokens: 116_000, window: 200_000, percent: 58 },
-    rateLimits: [{ kind: 'five_hour', percentUsed: 23, resetsAt: '2026-10-24T14:14:00Z' }],
+    rateLimits: [
+      { kind: 'five_hour', percentUsed: 23, resetsAt: '2026-10-24T14:14:00Z' },
+      { kind: 'seven_day', percentUsed: 65, resetsAt: '2026-10-26T05:00:00Z' },
+    ],
     cost: { usd: 1.84 },
     changed: ['context', 'rateLimits', 'cost'],
   })
@@ -34,8 +37,10 @@ test('draws context, rate limits and cost, and counts down to the reset', async 
   const ui = await $.ui.mount(band)
   const text = async () => (await ui.find({ type: 'Text' }))?.text
 
-  expect(await text()).toBe('ctx 58% (116k/200k)  ·  5h 23% (resets 2h14m)  ·  $1.84')
-  expect(await text()).not.toMatch(/[▓░]/)
+  // only the context keeps a bar; the rate limits read as plain percentages
+  expect(await text()).toBe(
+    'ctx ▓▓▓▓▓▓░░░░ 58% (116k/200k)  ·  5h 23% (resets 2h14m)  ·  7d 65% (resets 1d17h)  ·  $1.84',
+  )
 
   await clock.advance(60_000)
 
@@ -103,7 +108,7 @@ test('stacks under another mod instead of replacing it', async ($, on) => {
   const ui = await $.ui.mount(band)
 
   expect((await ui.find({ type: 'Text', text: 'other' }))?.text).toBe('other')
-  expect((await ui.find({ type: 'Text', text: /^ctx / }))?.text).toBe('ctx 58% (116k/200k)')
+  expect((await ui.find({ type: 'Text', text: /^ctx / }))?.text).toBe('ctx ▓▓▓▓▓▓░░░░ 58% (116k/200k)')
 })
 
 test('keeps the other mod visible when there is nothing to draw or a survey is up', async ($, on) => {
