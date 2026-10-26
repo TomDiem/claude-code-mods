@@ -156,6 +156,31 @@ test('polls only in an interactive session', { ...github }, async ($, on) => {
   expect(calls()).toBe(0)
 })
 
+const calendar = { options: { calendar: true } }
+
+test('fetches only Calendar when only Calendar is enabled, and counts down on the minute tick', { ...calendar }, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.store(on)
+  on('ui.render', empty)
+  on('session.start', (_: any, e: any) => ({ cwd: e.cwd }))
+
+  let runs = 0
+  let asked = 0
+  const standup = { id: 's', summary: 'Standup', htmlLink: 'u', start: { dateTime: new Date(START + 12 * MINUTE).toISOString() }, end: { dateTime: new Date(START + 42 * MINUTE).toISOString() } }
+  on('process.run', () => ({ value: (runs++, reply(1)) }))
+  on('mcp.call', () => ({ value: (asked++, { content: [{ type: 'text', text: JSON.stringify({ events: [standup] }) }], isError: false }) }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.advance(0)
+
+  const texts = async () => (await (await $.ui.mount(band)).findAll({ type: 'Text' })).map((t: any) => t.text)
+
+  expect(await texts()).toEqual(['📅 in 12m: Standup'])
+
+  await clock.advance(5 * MINUTE)
+  expect(await texts()).toEqual(['📅 in 7m: Standup'])
+  expect([runs, asked]).toEqual([0, 1])
+})
+
 const nextTryAt = START + 5 * MINUTE
 const malformed = {
   'items that are not a list': { items: 'oops', at: START, fails: 0, nextTryAt },
