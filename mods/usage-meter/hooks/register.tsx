@@ -11,7 +11,14 @@ const MINUTE = 60_000
 const WARN_PERCENT = 80
 const LABELS: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
 
+const BAR_WIDTH = 10
+
 const k = (tokens: number) => `${Math.round(tokens / 1000)}k`
+
+const bar = (percent: number) => {
+  const filled = Math.round((Math.min(percent, 100) / 100) * BAR_WIDTH)
+  return '▓'.repeat(filled) + '░'.repeat(BAR_WIDTH - filled)
+}
 
 const dollars = (amount: number) => `$${amount.toFixed(2)}`
 
@@ -33,7 +40,7 @@ const totals = ({ context, rateLimits, usd }: Usage, time: number) => {
   const parts: string[] = []
 
   if (context.tokens !== undefined && context.percent !== undefined) {
-    parts.push(`ctx ${context.percent}% (${k(context.tokens)}/${k(context.window)})`)
+    parts.push(`ctx ${bar(context.percent)} ${context.percent}% (${k(context.tokens)}/${k(context.window)})`)
   }
 
   for (const { kind, percentUsed, resetsAt } of rateLimits) {

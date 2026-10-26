@@ -3,7 +3,7 @@
 A live band above the prompt showing how much of your context, rate limits and money the session is using, and what the last turn added.
 
 ```
-ctx 58% (116k/200k)  ·  5h 23% (resets 2h14m)  ·  $1.84
+ctx ▓▓▓▓▓▓░░░░ 58% (116k/200k)  ·  5h 23% (resets 2h14m)  ·  7d 65% (resets 1d17h)  ·  $1.84
 last turn +12k ctx, +$0.21
 ```
 
