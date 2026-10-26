@@ -245,6 +245,27 @@ test('draws a failing source dim, with no color', { ...github }, async ($, on) =
   expect(failed.props.color).toBeUndefined()
 })
 
+test('does not call the connector while Calendar is disabled', { ...github }, async ($, on) => {
+  let asked = 0
+  on('mcp.call', () => ({ value: (asked++, { content: [], isError: false }) }))
+  const { clock } = await world($, on, [reply(1)])
+
+  await clock.advance(10 * MINUTE)
+
+  expect(asked).toBe(0)
+})
+
+test('says why Calendar failed when it never worked, dim like GitHub', { ...calendar }, async ($, on) => {
+  on('mcp.call', () => {
+    throw new Error('the host refused the call')
+  })
+  await world($, on, [reply(1)])
+  const [failed] = await texted($)
+
+  expect(failed.text).toBe('📅 calendar: tool-error')
+  expect(failed.props).toMatchObject({ dimColor: true })
+})
+
 const segment = (rank: number, tone: Segment['tone'], ...levels: string[]): Segment => ({ rank, tone, levels })
 const reviewSegment = segment(0, 'urgent', '🔀 app#12 review requested', '🔀 #12 review', '🔀 1 PR')
 const standup = segment(1, 'active', '📅 Standup in 12 min', '📅 12 min', '📅 1')

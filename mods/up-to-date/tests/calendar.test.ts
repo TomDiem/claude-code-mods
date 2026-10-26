@@ -67,6 +67,32 @@ test('keeps the timed events that can take my time', async () => {
   })
 })
 
+test('drops out-of-office, focus time and working location, keeps Gmail events and ones without a type', async () => {
+  const result = await fetched({
+    events: [
+      event('ooo', at(13), at(14), { eventType: 'OUT_OF_OFFICE' }),
+      event('focus', at(13), at(14), { eventType: 'FOCUS_TIME' }),
+      event('where', at(13), at(14), { eventType: 'WORKING_LOCATION' }),
+      event('gmail', at(13), at(14), { eventType: 'FROM_GMAIL' }),
+      event('default', at(15), at(16), { eventType: 'DEFAULT' }),
+      event('untyped', at(17), at(18)),
+    ],
+  })
+
+  expect(result.ok && result.items.map(i => i.id)).toEqual(['gmail', 'default', 'untyped'])
+})
+
+test('keeps an event without attendees, titles one without a summary, and skips one without an end', async () => {
+  const result = await fetched({
+    events: [
+      event('solo', at(13), at(14), { attendees: undefined, summary: undefined }),
+      event('open', at(15), at(16), { end: undefined }),
+    ],
+  })
+
+  expect(result).toEqual({ ok: true, items: [{ ...item('solo', at(13), at(14)), title: '(no title)' }] })
+})
+
 test('treats a response without events as an empty calendar', async () => {
   expect(await fetched({ summary: 'me', timeZone: 'UTC' })).toEqual({ ok: true, items: [] })
 })
@@ -76,7 +102,7 @@ test('asks list_events for the next events in start order', async () => {
 
   await calendar.fetch(ioWith(reply({}), calls), NOW)
 
-  expect(calls).toEqual([['claude.ai Google Calendar', 'list_events', { pageSize: 30, orderBy: 'startTime' }]])
+  expect(calls).toEqual([['claude.ai Google Calendar', 'list_events', { pageSize: 100, orderBy: 'startTime' }]])
 })
 
 test('is enabled only when the calendar option is on', () => {
@@ -89,6 +115,12 @@ test('reports a server that is not connected as not-connected', async () => {
   for (const message of ['Server "claude.ai Google Calendar" is not connected', 'Unauthorized', 'MCP server not found']) {
     expect(await calendar.fetch(ioWith(new Error(message)), NOW)).toEqual({ ok: false, reason: 'not-connected' })
   }
+})
+
+test('reports a failed call that says it is not connected as not-connected', async () => {
+  const failed = { content: [{ type: 'text', text: 'Unauthorized: sign in again' }], isError: true }
+
+  expect(await calendar.fetch(ioWith(failed), NOW)).toEqual({ ok: false, reason: 'not-connected' })
 })
 
 test('reports any other rejection and a failed call as tool-error', async () => {
@@ -129,6 +161,20 @@ test('shows the clock time of a meeting further out, ranking it by how near it i
 
 test('adds the weekday to a meeting that is not today', () => {
   expect(segmentOf([item('p', at(9, 0, 28), at(10, 0, 28), 'Planning')])?.levels[0]).toBe('📅 Wed 09:00 Planning')
+})
+
+test('never rounds a countdown up to 60m, and ranks by the exact 15m and 2h boundaries', () => {
+  expect(segmentOf([item('p', NOW + 59 * MINUTE + 30_000, NOW + 2 * HOUR)])?.levels[0]).toBe('📅 12:59 Event p')
+  expect(segmentOf([item('p', NOW + 59 * MINUTE, NOW + 2 * HOUR)])?.levels[0]).toBe('📅 in 59m: Event p')
+  expect(segmentOf([item('p', NOW + 15 * MINUTE, NOW + HOUR)])).toMatchObject({ rank: 0, tone: 'urgent' })
+  expect(segmentOf([item('p', NOW + 15 * MINUTE + 1, NOW + HOUR)])).toMatchObject({ rank: 2 })
+  expect(segmentOf([item('p', NOW + 2 * HOUR, NOW + 3 * HOUR)])).toMatchObject({ rank: 2 })
+  expect(segmentOf([item('p', NOW + 2 * HOUR + 1, NOW + 3 * HOUR)])).toMatchObject({ rank: 3 })
+})
+
+test('counts an event exactly as long as the limit', () => {
+  expect(segmentOf([item('p', at(13), at(16))])?.levels[2]).toBe('📅 1 meeting')
+  expect(segmentOf([item('p', at(13), at(16) + 1)])).toBeUndefined()
 })
 
 test('shows a meeting in progress in the active tone', () => {

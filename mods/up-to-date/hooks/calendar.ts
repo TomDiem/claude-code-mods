@@ -9,12 +9,15 @@ const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const SOON = 15 * MINUTE
 const MAX_BLOCK_HOURS = 3
+// the countdown is rounded up, so it reads "in 59m" at most and the clock time takes over after
+const COUNTDOWN = 59 * MINUTE
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 type Event = {
   id?: string
   summary?: string
   status?: string
+  eventType?: string
   transparency?: string
   availability?: string
   start?: { dateTime?: string }
@@ -23,18 +26,21 @@ type Event = {
   htmlLink?: string
 }
 
-// all-day events have no dateTime; free time and what I turned down never take my time
+// all-day events have no dateTime; free time, what I turned down and time I blocked for myself
+// or marked as away are not meetings
+const NOT_MEETINGS = ['OUT_OF_OFFICE', 'FOCUS_TIME', 'WORKING_LOCATION']
+
 const meeting = (event: Event): Meeting | undefined => {
   const start = Date.parse(event.start?.dateTime ?? '')
   const end = Date.parse(event.end?.dateTime ?? '')
   const declined = event.attendees?.some(who => who.self && who.responseStatus === 'declined')
   const free = event.transparency === 'transparent' || event.availability === 'AVAILABILITY_FREE'
 
-  if (event.status === 'cancelled' || declined || free || Number.isNaN(start) || Number.isNaN(end)) {
+  if (event.status === 'cancelled' || NOT_MEETINGS.includes(event.eventType ?? '') || declined || free || Number.isNaN(start) || Number.isNaN(end)) {
     return undefined
   }
 
-  return { id: event.id ?? '', title: event.summary ?? '', start, end, url: event.htmlLink ?? '' }
+  return { id: event.id ?? '', title: event.summary || '(no title)', start, end, url: event.htmlLink ?? '' }
 }
 
 const NOT_CONNECTED = /not connected|unauthori|not found/i
@@ -47,13 +53,13 @@ const fetchMeetings = async (io: Io): Promise<Fetched<Meeting>> => {
   let result: { content?: { text?: unknown }[]; isError?: boolean }
 
   try {
-    result = (await io.mcp(SERVER, 'list_events', { pageSize: 30, orderBy: 'startTime' })) as typeof result
+    result = (await io.mcp(SERVER, 'list_events', { pageSize: 100, orderBy: 'startTime' })) as typeof result
   } catch (error) {
     return { ok: false, reason: failure(error) }
   }
 
   if (result?.isError) {
-    return { ok: false, reason: 'tool-error' }
+    return { ok: false, reason: failure(new Error(String(result.content?.[0]?.text))) }
   }
 
   try {
@@ -89,7 +95,7 @@ const when = ({ start }: Meeting, now: number) => {
     return 'now'
   }
 
-  if (start - now < HOUR) {
+  if (start - now <= COUNTDOWN) {
     return `in ${Math.ceil((start - now) / MINUTE)}m`
   }
 
@@ -115,7 +121,7 @@ const segment = (items: Meeting[], now: number, options: Record<string, unknown>
   const more = meetings.length > 1 ? ` +${meetings.length - 1}` : ''
   const live = top.start <= now
   // relative labels lead with a colon, clock times do not
-  const colon = top.start - now < HOUR ? ':' : ''
+  const colon = top.start - now <= COUNTDOWN ? ':' : ''
 
   return {
     rank: rank(top, now),
