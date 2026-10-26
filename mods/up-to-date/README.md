@@ -37,7 +37,8 @@ Each `repo#number` is a link to the PR, followed by its title (dim) and `(draft)
 - A PR that matches several reasons counts once, under the most urgent.
 - On a narrow terminal the least urgent source shortens fully first (`🔀 #12 review +2`, then `🔀 3 PRs`), then the next one up. Only when every source is at its shortest does the least urgent get dropped, shown as ` · +N` for the N dropped.
 - `~` before a segment (drawn dim) means the source is failing and the segment is the last good result. A source that never worked shows `🔀 github: <reason>` dim, or `🔀 !` when there is no room (`not-connected`, `tool-error`, `parse-error` or `timeout`).
-- Failing sources back off instead of retrying every minute.
+- Failing sources back off instead of retrying every minute: one ttl after the first failure, then doubling, up to 30 minutes.
+- Calendar draws nothing on the line while it has never worked, since its first fetch can run before the connector is up; the details pane still says why.
 - Calendar shows the next 7 days of your calendar. It leaves out cancelled events, ones you declined, all-day events, free (not busy) events, ones that already ended, and ones longer than `calendarMaxBlockHours` (3 by default), which are usually focus blocks. The countdown updates every minute without calling the connector again; a meeting further out than today shows its weekday (`Wed 09:00 Planning`).
 - `changes` relies on GitHub's review decision, which is empty on repos without required reviews, so those PRs never show it.
 
