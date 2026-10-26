@@ -284,6 +284,16 @@ test('says why Calendar failed when it never worked, dim like GitHub', { ...cale
   expect(failed.props).toMatchObject({ dimColor: true })
 })
 
+test('keeps a meeting within 15 minutes over a review request when only one fits', { options: { github: true, calendar: true } }, async ($, on) => {
+  const standup = { id: 's', summary: 'Standup', htmlLink: 'u', start: { dateTime: new Date(START + 12 * MINUTE).toISOString() }, end: { dateTime: new Date(START + 42 * MINUTE).toISOString() } }
+  on('mcp.call', () => ({ value: { content: [{ type: 'text', text: JSON.stringify({ events: [standup] }) }], isError: false } }))
+  await world($, on, [reply(1)])
+  const narrow = await $.ui.mount({ ...band, props: { ...band.props, bodyColumns: 16 } })
+
+  // both are rank 0: the meeting does not wait, the review can
+  expect((await narrow.findAll({ type: 'Text' })).map((t: any) => t.text)).toEqual(['📅 in 12m', ' · +1'])
+})
+
 const segment = (rank: number, tone: Segment['tone'], ...levels: string[]): Segment => ({ rank, tone, levels })
 const reviewSegment = segment(0, 'urgent', '🔀 app#12 review requested', '🔀 #12 review', '🔀 1 PR')
 const standup = segment(1, 'active', '📅 Standup in 12 min', '📅 12 min', '📅 1')
