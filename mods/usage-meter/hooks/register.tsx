@@ -7,15 +7,9 @@ const usage = atom({ plugin: 'usage-meter', key: 'usage' } as const, null)
 const last = atom({ plugin: 'usage-meter', key: 'last' } as const, null)
 const now = atom({ plugin: 'usage-meter', key: 'now' } as const, 0)
 
-const BAR_WIDTH = 10
 const MINUTE = 60_000
 const WARN_PERCENT = 80
 const LABELS: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
-
-const bar = (percent: number) => {
-  const filled = Math.round((Math.min(percent, 100) / 100) * BAR_WIDTH)
-  return '▓'.repeat(filled) + '░'.repeat(BAR_WIDTH - filled)
-}
 
 const k = (tokens: number) => `${Math.round(tokens / 1000)}k`
 
@@ -39,12 +33,12 @@ const totals = ({ context, rateLimits, usd }: Usage, time: number) => {
   const parts: string[] = []
 
   if (context.tokens !== undefined && context.percent !== undefined) {
-    parts.push(`ctx ${bar(context.percent)} ${context.percent}% (${k(context.tokens)}/${k(context.window)})`)
+    parts.push(`ctx ${context.percent}% (${k(context.tokens)}/${k(context.window)})`)
   }
 
   for (const { kind, percentUsed, resetsAt } of rateLimits) {
     const reset = resetsAt ? ` (resets ${duration(Date.parse(resetsAt) - time)})` : ''
-    parts.push(`${LABELS[kind] ?? kind} ${bar(percentUsed)} ${percentUsed}%${reset}`)
+    parts.push(`${LABELS[kind] ?? kind} ${percentUsed}%${reset}`)
   }
 
   if (usd !== undefined) {
