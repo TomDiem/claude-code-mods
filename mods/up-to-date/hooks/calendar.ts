@@ -152,6 +152,7 @@ export const calendar: Source<Meeting> = {
   icon: ICON,
   ttlMs: CALENDAR_TTL,
   ttl,
+  quiet: true,
   enabled: options => options.calendar === true,
   fetch: fetchMeetings,
   segment,

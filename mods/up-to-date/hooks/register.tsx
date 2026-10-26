@@ -82,7 +82,7 @@ const segmentOf = (
   const state = status(entry, true)
 
   if (state === 'failed') {
-    return { rank: AFTER_ALL, tone: 'muted', levels: [`${source.icon} ${source.id}: ${entry?.error?.reason}`, `${source.icon} !`] }
+    return source.quiet ? undefined : { rank: AFTER_ALL, tone: 'muted', levels: [`${source.icon} ${source.id}: ${entry?.error?.reason}`, `${source.icon} !`] }
   }
 
   const segment = source.segment(entry?.items ?? [], time, options)

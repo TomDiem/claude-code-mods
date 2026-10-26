@@ -27,6 +27,9 @@ export type Source<I = unknown> = {
   // leads the source's segment, also when it only says why it is failing
   icon: string
   ttlMs: number
+  // the line stays silent while it has never worked: its first fetch can run before the
+  // host has connected, and the quiet retry is enough; the pane still says why
+  quiet?: boolean
   // a shorter (or longer) wait worked out from what was just fetched; absent: ttlMs
   ttl?(items: I[], now: number): number
   enabled(options: Options): boolean

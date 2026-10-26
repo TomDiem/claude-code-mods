@@ -273,15 +273,41 @@ test('does not call the connector while Calendar is disabled', { ...github }, as
   expect(asked).toBe(0)
 })
 
-test('says why Calendar failed when it never worked, dim like GitHub', { ...calendar }, async ($, on) => {
+const refused = (on: any) =>
   on('mcp.call', () => {
     throw new Error('the host refused the call')
   })
-  await world($, on, [reply(1)])
-  const [failed] = await texted($)
 
-  expect(failed.text).toBe('📅 calendar: tool-error')
-  expect(failed.props).toMatchObject({ dimColor: true })
+test('draws nothing for Calendar when it failed and never worked: the retry is quiet', { ...calendar }, async ($, on) => {
+  refused(on)
+  await world($, on, [reply(1)])
+
+  expect(await texted($)).toEqual([])
+})
+
+test('draws only GitHub when Calendar failed and never worked', { options: { github: true, calendar: true } }, async ($, on) => {
+  refused(on)
+  await world($, on, [reply(1)])
+
+  expect((await texted($)).map(t => t.text)).toEqual(['🔀 app#1 review requested'])
+})
+
+test('keeps drawing a stale Calendar with its last meetings, marked with a tilde', { ...calendar }, async ($, on) => {
+  refused(on)
+  const meeting = { id: 's', title: 'Standup', start: START + 12 * MINUTE, end: START + 42 * MINUTE, url: 'u' }
+  const entry = { items: [meeting], at: START, error: { reason: 'tool-error', at: START }, fails: 1, nextTryAt: START + 5 * MINUTE }
+  await world($, on, [reply(1)], { 'up-to-date:v1:calendar': entry })
+  const [stale] = await texted($)
+
+  expect(stale.text).toBe('~📅 in 12m: Standup')
+  expect(stale.props).toMatchObject({ dimColor: true })
+})
+
+test('still says in the pane why Calendar failed', { ...calendar }, async ($, on) => {
+  refused(on)
+  await world($, on, [reply(1)])
+
+  expect((await body($)).texts).toEqual(['📅 Calendar: tool-error'])
 })
 
 test('keeps a meeting within 15 minutes over a review request when only one fits', { options: { github: true, calendar: true } }, async ($, on) => {
